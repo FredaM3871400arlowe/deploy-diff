@@ -40,6 +40,16 @@ def test_get_commits_between_empty(mock_run_git):
     assert commits == []
 
 
+@patch("deploy_diff.changelog_formatter.run_git")
+def test_get_commits_between_strips_trailing_whitespace(mock_run_git):
+    """Ensure lines with extra whitespace are stripped cleanly."""
+    mock_run_git.return_value = make_run_result(
+        "abc1234 Fix login bug  \ndef5678 Add feature flag\t\n"
+    )
+    commits = get_commits_between(TAG_RANGE)
+    assert commits == ["abc1234 Fix login bug", "def5678 Add feature flag"]
+
+
 def test_format_changelog_with_changes():
     entry = ChangelogEntry(
         tag_range=TAG_RANGE,
@@ -81,6 +91,19 @@ def test_format_changelog_includes_diff_when_requested():
     assert "```diff" in output
     assert "-foo" in output
     assert "+bar" in output
+
+
+def test_format_changelog_excludes_diff_by_default():
+    """Verify that diff blocks are not shown unless include_diff=True."""
+    entry = ChangelogEntry(
+        tag_range=TAG_RANGE,
+        commits=[],
+        config_changes=[
+            ConfigChange(path="config/app.yaml", status="M", diff="-foo\n+bar"),
+        ],
+    )
+    output = format_changelog(entry)
+    assert "```diff" not in output
 
 
 @patch("deploy_diff.changelog_formatter.run_git")
